@@ -1,0 +1,5 @@
+install
+raylib
+boost-thread
+cpr
+nlohmann-json
