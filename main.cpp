@@ -1229,16 +1229,149 @@ int main(void)
             if (state == "errorStatusCode")
             {
                 
-                DrawTextEx(fontDefault,"HTTP request returned error",Vector2({0,0}),50,1,BLACK);
-                DrawTextEx(fontDefault,("error code: "+std::to_string(r.status_code)).c_str(),Vector2({0,100}),50,1,BLACK);
+                
                 if(r.status_code == 0)
                 {
-                DrawTextEx(fontDefault,"please ensure that you have stable internet connection",Vector2({0,200}),50,1,BLACK);
+                DrawTextEx(fontDefault,"please ensure that you have stable internet connection",Vector2({0,0}),50,1,BLUE);
+                DrawTextEx(fontDefault,"HTTP request returned error",Vector2({0,100}),50,1,BLACK);
+                DrawTextEx(fontDefault,("error code: "+std::to_string(r.status_code)).c_str(),Vector2({0,200}),50,1,BLACK);
                 }
                 else
                 {
-                DrawTextEx(fontDefault,"you can check what code coresponds to at:",Vector2({0,200}),50,1,BLACK);
-                DrawTextEx(fontDefault,"https://developer.mozilla.org/en-US/docs/Web/HTTP/Status",Vector2({0,300}),50,1,BLACK);
+                DrawTextEx(fontDefault,"HTTP request returned error",Vector2({0,0}),50,1,BLACK);
+                DrawTextEx(fontDefault,("error code: "+std::to_string(r.status_code)).c_str(),Vector2({0,100}),50,1,BLACK);
+                
+                
+                switch(r.status_code)
+                {
+                    case 400:
+                        DrawTextEx(fontDefault,"Bad Request",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 401:
+                        DrawTextEx(fontDefault,"Unauthorized",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 402:
+                        DrawTextEx(fontDefault,"Payment Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 403:
+                        DrawTextEx(fontDefault,"Forbidden",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 404:
+                        DrawTextEx(fontDefault,"Not Found",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 405:
+                        DrawTextEx(fontDefault,"Method Not Allowed",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 406:
+                        DrawTextEx(fontDefault,"Not Acceptable",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 407:
+                        DrawTextEx(fontDefault,"Proxy Authentication Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 408:
+                        DrawTextEx(fontDefault,"Request Timeout",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 409:
+                        DrawTextEx(fontDefault,"Conflict",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 410:
+                        DrawTextEx(fontDefault,"Gone",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 411:
+                        DrawTextEx(fontDefault,"Length Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 412:
+                        DrawTextEx(fontDefault,"Precondition Failed",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 413:
+                        DrawTextEx(fontDefault,"Payload Too Large",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 414:
+                        DrawTextEx(fontDefault,"URI Too Long",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 415:
+                        DrawTextEx(fontDefault,"Unsupported Media Type",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 416:
+                        DrawTextEx(fontDefault,"Range Not Satisfiable",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 417:
+                        DrawTextEx(fontDefault,"Expectation Failed",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 418:
+                        DrawTextEx(fontDefault,"I'm a teapot",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 421:
+                        DrawTextEx(fontDefault,"Misdirected Request",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 422:
+                        DrawTextEx(fontDefault,"Unprocessable Entity",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 423:
+                        DrawTextEx(fontDefault,"Locked",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 424:
+                        DrawTextEx(fontDefault,"Failed Dependency",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 425:
+                        DrawTextEx(fontDefault,"Too Early",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 426:
+                        DrawTextEx(fontDefault,"Upgrade Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 428:
+                        DrawTextEx(fontDefault,"Precondition Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 429:
+                        DrawTextEx(fontDefault,"Too Many Requests",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 431:
+                        DrawTextEx(fontDefault,"Request Header Fields Too Large",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 451:
+                        DrawTextEx(fontDefault,"Unavailable For Legal Reasons",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 500:
+                        DrawTextEx(fontDefault,"Internal Server Error",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 501:
+                        DrawTextEx(fontDefault,"Not Implemented",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 502:
+                        DrawTextEx(fontDefault,"Bad Gateway",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 503:
+                        DrawTextEx(fontDefault,"Service Unavailable",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 504:
+                        DrawTextEx(fontDefault,"Gateway Timeout",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 505:
+                        DrawTextEx(fontDefault,"HTTP Version Not Supported",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 506:
+                        DrawTextEx(fontDefault,"Variant Also Negotiates",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 507:
+                        DrawTextEx(fontDefault,"Insufficient Storage",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 508:
+                        DrawTextEx(fontDefault,"Loop Detected",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 510:
+                        DrawTextEx(fontDefault,"Not Extended",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    case 511:
+                        DrawTextEx(fontDefault,"Network Authentication Required",Vector2({0,200}),50,1,BLUE);
+                        break;
+                    
+                    default:
+                        DrawTextEx(fontDefault,"unknown error code, check on internet what it means",Vector2({0,200}),50,1,BLUE);
+                        break;
+
+                }
+                DrawTextEx(fontDefault,"you can check what all error codes coresponds to at:",Vector2({0,300}),50,1,BLACK);
+                DrawTextEx(fontDefault,"https://developer.mozilla.org/en-US/docs/Web/HTTP/Status",Vector2({0,400}),50,1,BLACK);
                 }
                 for(Button i : buttonsVector)
                 {
