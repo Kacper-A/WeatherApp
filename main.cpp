@@ -145,6 +145,26 @@ class InputBox{
         
 };
 
+void downloadCitiesJSON()
+{
+    CURL *curl;
+    FILE *fp;
+    CURLcode res;
+    std::string url = "https://raw.githubusercontent.com/lutangar/cities.json/master/cities.json";
+    std::string outfilename = "cities.json";
+    curl = curl_easy_init();                                                                                                                                                                                                                                                           
+    if (curl)
+    {   
+        fp = fopen(outfilename.c_str(),"wb");
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        res = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        fclose(fp);
+    }  
+}
+
 void DrawProgressBar(int xloc, int yloc,int width, int height,int max, int current,float fontSize)
 {
     DrawRectangle(xloc,yloc,width,height,BLACK);
@@ -162,6 +182,7 @@ void DrawProgressBar(int xloc, int yloc,int width, int height,int max, int curre
 
 void GetCountryCodesFromJson(nlohmann::json data, std::vector<std::string>* country_codes,int* max,int* current)
 {
+    std::sort(data.begin(), data.end(),[](const nlohmann::json &a, const nlohmann::json &b){return a["country"] < b["country"];});
     country_codes->clear();
     
     *max = int(data.size());
@@ -196,13 +217,18 @@ void GetCitiesFromSelectedCountry(nlohmann::json data, std::vector<std::string>*
 
 
 
-nlohmann::json openJsonAndPraseIt(std::string path)
+nlohmann::json openJsonAndPraseIt(std::string path) //used for cities.json
 {
 std::ifstream file(path);
-nlohmann::json data = nlohmann::json::parse(file);
+nlohmann::json data = nlohmann::ordered_json::parse(file);
 file.close();
+std::sort(data.begin(), data.end(),[](const nlohmann::json &a, const nlohmann::json &b){return a["name"] < b["name"];});
 return data;
 }
+
+inline bool doesFileExist (const std::string& name) { //https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exists-using-standard-c-c11-14-17-c
+  struct stat buffer;   
+  return (stat (name.c_str(), &buffer) == 0);}
 
 
 
@@ -225,7 +251,7 @@ int main(void)
     SetTargetFPS(60); 
 
     //std::string state = "start";
-    std::string state = "start";
+    std::string state = "savedStart";
 
     boost::thread t;
 
@@ -274,42 +300,13 @@ int main(void)
     int SavedLocationsShowing = 1;
     std::fstream savedLocationsFile;
     nlohmann::json savedLocationsJson;
-    savedLocationsFile.open("savedLocations.json",std::fstream::in | std::fstream::out |std::fstream::app);
-    savedLocationsFile.seekg(0, std::ios::end);
+    bool savedAllowed = true;
     
-    try
-    {
-        if (savedLocationsFile.tellg() == 0)
-        {   //flag
-            savedLocationsFile.seekg(0, std::ios::beg);
-            for (int i =0;i<maxSavedLocations;i++)
-            {
-                savedLocationsJson[i]["name"]= "empty";
-                savedLocationsJson[i]["lat"]= "";
-                savedLocationsJson[i]["lng"]= "";
-            }
+    bool isJSONCitiesLoaded = false;
 
-            savedLocationsFile<<savedLocationsJson;
-        }
-        else
-        {
-            savedLocationsFile.seekg(0, std::ios::beg);
-            savedLocationsJson = nlohmann::json::parse(savedLocationsFile); //here is where is parse error if file is fucked up
-        }
-    }
-    
-    catch(nlohmann::json::parse_error& ex)
+    if(!doesFileExist("cities.json"))
     {
-        state = "openingJsonError";
-    }
-    savedLocationsFile.close();
-
-    for (int i =0;i<maxSavedLocations;i++)
-    {
-        if(savedLocationsJson[i]["name"] != "empty")
-        {
-            SavedLocationsShowing = i+1;
-        }
+        downloadCitiesJSON();
     }
 
     
@@ -321,9 +318,51 @@ int main(void)
             mouseX = GetMouseX();
             mouseY = GetMouseY();
             ClearBackground(RAYWHITE);
+            if(state == "savedStart")
+            {
+                savedLocationsFile.open("savedLocations.json",std::fstream::in | std::fstream::out |std::fstream::app);
+                savedLocationsFile.seekg(0, std::ios::end);
+                
+                try
+                {
+                    if (savedLocationsFile.tellg() == 0)
+                    {   //flag
+                        savedLocationsFile.seekg(0, std::ios::beg);
+                        for (int i =0;i<maxSavedLocations;i++)
+                        {
+                            savedLocationsJson[i]["name"]= "empty";
+                            savedLocationsJson[i]["lat"]= "";
+                            savedLocationsJson[i]["lng"]= "";
+                        }
+
+                        savedLocationsFile<<savedLocationsJson;
+                    }
+                    else
+                    {
+                        savedLocationsFile.seekg(0, std::ios::beg);
+                        savedLocationsJson = nlohmann::json::parse(savedLocationsFile); //here is where is parse error if file is fucked up
+                    }
+                }
+                
+                catch(nlohmann::json::parse_error& ex)
+                {
+                    state = "openingSavedLocationsJsonErrorButtons";
+                }
+                savedLocationsFile.close();
+
+                for (int i =0;i<maxSavedLocations;i++)
+                {
+                    if(savedLocationsJson[i]["name"] != "empty")
+                    {
+                        SavedLocationsShowing = i+1;
+                    }
+                }
+                state = "start";
+            }
             if(state == "start")
             {
-                
+                inputBoxVector.clear();
+                buttonsVector.clear();
                 buttonToEdit.width = 500;
                 buttonToEdit.height = 60;
                 buttonToEdit.text = "Take data from json";
@@ -342,6 +381,19 @@ int main(void)
                 buttonToEdit.yloc = 500;
                 buttonToEdit.xloc=100;
                 buttonToEdit.text = "saved";
+                if(savedAllowed)
+                {
+                    buttonToEdit.color = BLUE;
+                }
+                else
+                {
+                    buttonToEdit.color = GRAY;
+                }
+                buttonsVector.push_back(buttonToEdit);
+                buttonToEdit.color = BLUE;
+
+                buttonToEdit.xloc = 680;
+                buttonToEdit.text = "Download JSON";
                 buttonsVector.push_back(buttonToEdit);
 
                 state = "selectMode";
@@ -382,10 +434,14 @@ int main(void)
                             buttonsVector.push_back(buttonToEdit);
                             state = "manualCoordinates";
                         }
-                        if( i.text == "saved")
+                        if( i.text == "saved" && savedAllowed)
                         {
                             buttonsVector.clear();
                             state = "savedButtons";
+                        }
+                        if(i.text == "Download JSON")
+                        {
+                            downloadCitiesJSON();
                         }
                     }
                     
@@ -393,65 +449,72 @@ int main(void)
             }
             if(state == "savedButtons")
             {
-                
-                for (int i =0;i<maxSavedLocations;i++)
+                try
                 {
-                    if (SavedLocationsShowing > i)
+                    for (int i =0;i<maxSavedLocations;i++)
                     {
+                        if (SavedLocationsShowing > i)
+                        {
 
+                            buttonToEdit.fontSize = 20;
+                            buttonToEdit.width = 500;
+                            buttonToEdit.height = 50;
+                            buttonToEdit.xloc = 100;
+                            buttonToEdit.yloc = 100 + i*50;
+                            
+                            buttonToEdit.text = savedLocationsJson[i]["name"];
+                            if(buttonToEdit.text == "empty")
+                            {
+                                buttonToEdit.text = buttonToEdit.text + std::to_string(i+1);
+                                buttonToEdit.color = GRAY;
+                            }
+                            else
+                            {
+                                buttonToEdit.color = BLUE;
+                            }
+                            buttonsVector.push_back(buttonToEdit);
+                            buttonToEdit.width = 100;
+                            buttonToEdit.height = 50;
+                            buttonToEdit.xloc = 600;
+                            buttonToEdit.yloc = 100 + i*50;
+                            buttonToEdit.text = "edit"+ std::to_string(i+1);
+                            buttonToEdit.color = GREEN;
+                            buttonsVector.push_back(buttonToEdit);
+                            buttonToEdit.width = 100;
+                            buttonToEdit.height = 50;
+                            buttonToEdit.xloc = 700;
+                            buttonToEdit.yloc = 100 + i*50;
+                            buttonToEdit.text = "delete"+ std::to_string(i+1);
+                            buttonToEdit.color = RED;
+                            buttonsVector.push_back(buttonToEdit);
+                            
+                        }
+                        if (SavedLocationsShowing == i)
+                        {
+                            buttonToEdit.width = 500;
+                            buttonToEdit.height = 50;
+                            buttonToEdit.xloc = 200;
+                            buttonToEdit.yloc = 100 + i*50;
+                            buttonToEdit.text = "add empty";
+                            buttonToEdit.color = GREEN;
+                            buttonsVector.push_back(buttonToEdit);
+                        }
+                    }
+                    buttonToEdit.xloc = 0;
+                    buttonToEdit.yloc = 0;
+                    buttonToEdit.width = 500;
+                    buttonToEdit.height = 50;
+                    buttonToEdit.text = "go back";
+                    buttonToEdit.color = BLUE;
+                    buttonsVector.push_back(buttonToEdit);
                     
-                        buttonToEdit.width = 500;
-                        buttonToEdit.height = 50;
-                        buttonToEdit.xloc = 100;
-                        buttonToEdit.yloc = 100 + i*50;
-                        
-                        buttonToEdit.text = savedLocationsJson[i]["name"];
-                        if(buttonToEdit.text == "empty")
-                        {
-                            buttonToEdit.text = buttonToEdit.text + std::to_string(i+1);
-                            buttonToEdit.color = GRAY;
-                        }
-                        else
-                        {
-                            buttonToEdit.color = BLUE;
-                        }
-                        buttonsVector.push_back(buttonToEdit);
-                        buttonToEdit.width = 100;
-                        buttonToEdit.height = 50;
-                        buttonToEdit.xloc = 600;
-                        buttonToEdit.yloc = 100 + i*50;
-                        buttonToEdit.text = "edit"+ std::to_string(i+1);
-                        buttonToEdit.color = GREEN;
-                        buttonsVector.push_back(buttonToEdit);
-                        buttonToEdit.width = 100;
-                        buttonToEdit.height = 50;
-                        buttonToEdit.xloc = 700;
-                        buttonToEdit.yloc = 100 + i*50;
-                        buttonToEdit.text = "delete"+ std::to_string(i+1);
-                        buttonToEdit.color = RED;
-                        buttonsVector.push_back(buttonToEdit);
-                        
-                    }
-                    if (SavedLocationsShowing == i)
-                    {
-                        buttonToEdit.width = 500;
-                        buttonToEdit.height = 50;
-                        buttonToEdit.xloc = 200;
-                        buttonToEdit.yloc = 100 + i*50;
-                        buttonToEdit.text = "add empty";
-                        buttonToEdit.color = GREEN;
-                        buttonsVector.push_back(buttonToEdit);
-                    }
+                    state = "saved";
                 }
-                buttonToEdit.xloc = 0;
-                buttonToEdit.yloc = 0;
-                buttonToEdit.width = 500;
-                buttonToEdit.height = 50;
-                buttonToEdit.text = "go back";
-                buttonToEdit.color = BLUE;
-                buttonsVector.push_back(buttonToEdit);
+                catch(...)
+                {
+                    state = "openingSavedLocationsJsonErrorButtons";
+                }
                 
-                state = "saved";
             }
             if(state == "saved")
             {
@@ -604,8 +667,8 @@ int main(void)
                     {
                         if (i.text =="back to selection")
                         {
-                            inputBoxVector.clear();
-                            buttonsVector.clear();
+                            
+                            
                             state = "start";
                         }
                         if (i.text =="confirm")
@@ -614,8 +677,6 @@ int main(void)
                             {
                                 lat = inputBoxVector[0].text;
                                 lng = inputBoxVector[1].text;
-                                inputBoxVector.clear();
-                                buttonsVector.clear();
                                 state = "sendRequest";
                             }
                         }
@@ -636,13 +697,20 @@ int main(void)
             }
             if(state == "loadJSON")
                 {
-                    
-                    data = openJsonAndPraseIt(boost::ref(path)); //nlohmann::json has undefined behavior when you write data to refrence
-                    //can't prase json in thread because of it I think, or mayby I'm just stupid
-                    state = "getCountryCodesStart";
+                    if(isJSONCitiesLoaded == false)   
+                    {
+                        data = openJsonAndPraseIt(boost::ref(path)); //nlohmann::json has undefined behavior when you write data to refrence
+                        //can't prase json in thread because of it I think, or mayby I'm just stupid
+                        state = "getCountryCodesStart";
+                    }
+                    else
+                    {
+                        state ="sellectCountryStart";
+                    }
                 }
             if(state == "getCountryCodesStart")
                 {
+                    
                     current = 0;
                     t = boost::thread(boost::bind(&GetCountryCodesFromJson,boost::ref(data),&country_codes,&max,&current));
                     state = "getCountryCodesLoading";
@@ -653,12 +721,14 @@ int main(void)
                     if(t.timed_join(boost::posix_time::seconds(0))) //checks if thread finished
                     {
                         t.join();
+                        isJSONCitiesLoaded = true;
                         state = "sellectCountryStart";
                     }
                     
             }
             if(state == "sellectCountryStart")
             {
+                std::sort(data.begin(), data.end(),[](const nlohmann::json &a, const nlohmann::json &b){return a["name"] < b["name"];});
                 buttonsVector.clear();
                 row = 3; 
                 column =0; 
@@ -682,6 +752,13 @@ int main(void)
                         row++;
                     }
                 }
+                buttonToEdit.xloc = 0;
+                buttonToEdit.yloc = 0;
+                buttonToEdit.height =60;
+                buttonToEdit.width =200;
+                buttonToEdit.text = "back to selection";
+                buttonToEdit.fontSize = 20;
+                buttonsVector.push_back(buttonToEdit);
                 state = "sellectCountryButtonScreen";
             }
             if(state == "sellectCountryButtonScreen")
@@ -692,10 +769,14 @@ int main(void)
                 for(Button i : buttonsVector)
                 {
                     i.Draw();
-                    if(i.IsClicked()) 
-                        {
-                            selectedCountryCode = i.text;
-                        }
+                    if(i.IsClicked()&& i.text != "back to selection") 
+                    {
+                        selectedCountryCode = i.text;
+                    }
+                    else if (i.IsClicked())
+                    {
+                        state = "start";
+                    }
                 }
                 if(selectedCountryCode != "")
                 {
@@ -932,13 +1013,20 @@ int main(void)
                 buttonToEdit.xloc = 0;
                 buttonToEdit.text = "back to start";
                 buttonsVector.push_back(buttonToEdit);
+                buttonToEdit.yloc = 0;
+                buttonToEdit.xloc = 100;
+                buttonToEdit.text = "add to saved";
+                buttonsVector.push_back(buttonToEdit);
                 state = "showDataMenu";
             }
             if (state == "showDataMenu")
             {
                 double current ;
                 DrawRectangle(200,100,880,520,Color({ 220, 220, 220, 255 }));
+                std::string title = "lat:"+lat+" lng:"+lng;
+                DrawTextEx(fontDefault,(title).c_str(),Vector2({640-MeasureTextEx(fontDefault,title.c_str(),50,1).x/2,50}),50,1,BLUE);
                 
+                DrawTextEx(fontDefault,chartType.c_str(),Vector2({640-MeasureTextEx(fontDefault,chartType.c_str(),50,1).x/2,100}),50,1,BLUE);
                 if(chartType == "Temperature")
                 {
                      current = temperatures[0];
@@ -948,9 +1036,18 @@ int main(void)
                     int maxElement = int( *std::max_element(temperatures.begin(),temperatures.end()) - std::fmod(*std::max_element(temperatures.begin(),temperatures.end()),1.0)+1);
                     int minElement = int(*std::min_element(temperatures.begin(),temperatures.end()) - std::fmod(*std::min_element(temperatures.begin(),temperatures.end()) ,1)-1);
                     int lineCount = int((*std::max_element(temperatures.begin(),temperatures.end()) - std::fmod(*std::max_element(temperatures.begin(),temperatures.end()) ,1)+1)-(*std::min_element(temperatures.begin(),temperatures.end()) - std::fmod(*std::min_element(temperatures.begin(),temperatures.end()) ,1)-1));
+                    
                     for(int i =0;i<=lineCount;i++)
                     {
+                        
+                        if(minElement+i== 0)
+                        {
+                        DrawLineEx(Vector2({200,float(500-(300.0/lineCount)*i) }),Vector2({1080,float(500-(300.0/lineCount)*i) }),1,BLUE);
+                        }
+                        else
+                        {
                         DrawLineEx(Vector2({200,float(500-(300.0/lineCount)*i) }),Vector2({1080,float(500-(300.0/lineCount)*i) }),1,Color({ 160, 160, 160, 255 }));
+                        }
                         DrawTextEx(fontDefault,(std::to_string(int(minElement) + i)+std::string(weatherData["hourly_units"]["temperature_2m"])).c_str(),Vector2({150.0,float(500-(300/lineCount)*i-9)}),16,1,BLACK);
                     }
                     
@@ -967,12 +1064,12 @@ int main(void)
                     current = humidity[0];
                     for(int i =0;i<=5;i++)
                     {
-                        DrawLineEx(Vector2({200,float(500-50*i)}),Vector2({1080,float(500-50*i)}),1,Color({ 160, 160, 160, 255 }));
-                        DrawTextEx(fontDefault,(std::to_string(i*20)+ std::string(weatherData["hourly_units"]["relativehumidity_2m"])).c_str(),Vector2({160.0,float(500-50*i-9)}),16,1,BLACK);
+                        DrawLineEx(Vector2({200,float(500-60*i)}),Vector2({1080,float(500-60*i)}),1,Color({ 160, 160, 160, 255 }));
+                        DrawTextEx(fontDefault,(std::to_string(i*20)+ std::string(weatherData["hourly_units"]["relativehumidity_2m"])).c_str(),Vector2({160.0,float(500-60*i-9)}),16,1,BLACK);
                     }
                     for(int i = 1;i<humidity.size();i++)
                     {
-                        DrawLineEx(Vector2({float((i-1)*5.238+200),float(500-current*2.5)}),Vector2({float((i)*5.238+200),float(500-humidity[i]*2.5)}),2,RED);
+                        DrawLineEx(Vector2({float((i-1)*5.238+200),float(500-current*3)}),Vector2({float((i)*5.238+200),float(500-humidity[i]*3)}),2,RED);
                         current = humidity[i];
                     }
                 }
@@ -1003,7 +1100,7 @@ int main(void)
                     {
                         
                         DrawLineEx(Vector2({200,float(500-(300/( *std::max_element(windspeed.begin(),windspeed.end()) - std::fmod(*std::max_element(windspeed.begin(),windspeed.end()),1.0)+1))*i) }),Vector2({1080,float(500-(300/( *std::max_element(windspeed.begin(),windspeed.end()) - std::fmod(*std::max_element(windspeed.begin(),windspeed.end()),1.0)+1))*i) }),1,Color({ 160, 160, 160, 255 }));
-                        DrawTextEx(fontDefault,(std::to_string(i)+std::string(weatherData["hourly_units"]["windspeed_10m"])).c_str(),Vector2({150.0,float(500-(300/( *std::max_element(windspeed.begin(),windspeed.end()) - std::fmod(*std::max_element(windspeed.begin(),windspeed.end()),1.0)+1))*i-9)}),16,1,BLACK);
+                        DrawTextEx(fontDefault,(std::to_string(i)+std::string(weatherData["hourly_units"]["windspeed_10m"])).c_str(),Vector2({140.0,float(500-(300/( *std::max_element(windspeed.begin(),windspeed.end()) - std::fmod(*std::max_element(windspeed.begin(),windspeed.end()),1.0)+1))*i-9)}),16,1,BLACK);
                     }
                     for(int i =0 ; i < windspeed.size();i++)
                     {
@@ -1023,7 +1120,7 @@ int main(void)
                     for(int i =0;i<=lineCount;i++)
                     {
                         DrawLineEx(Vector2({200,float(500-(300.0/lineCount)*i) }),Vector2({1080,float(500-(300.0/lineCount)*i) }),1,Color({ 160, 160, 160, 255 }));
-                        DrawTextEx(fontDefault,(std::to_string(int(*std::min_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::min_element(surfacePressure.begin(),surfacePressure.end()) ,1)) + i)+std::string(weatherData["hourly_units"]["surface_pressure"])).c_str(),Vector2({150.0,float(500-(300/((*std::max_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::max_element(surfacePressure.begin(),surfacePressure.end()) ,1)+1)-(*std::min_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::min_element(surfacePressure.begin(),surfacePressure.end()) ,1))))*i-9)}),16,1,BLACK);
+                        DrawTextEx(fontDefault,(std::to_string(int(*std::min_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::min_element(surfacePressure.begin(),surfacePressure.end()) ,1)) + i)+std::string(weatherData["hourly_units"]["surface_pressure"])).c_str(),Vector2({130.0,float(500-(300/((*std::max_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::max_element(surfacePressure.begin(),surfacePressure.end()) ,1)+1)-(*std::min_element(surfacePressure.begin(),surfacePressure.end()) - std::fmod(*std::min_element(surfacePressure.begin(),surfacePressure.end()) ,1))))*i-9)}),16,1,BLACK);
                     }
                     
                     for(int i =0 ; i < surfacePressure.size();i++)
@@ -1044,7 +1141,8 @@ int main(void)
                 }
                 if (!isHistorical)
                 {
-                    DrawLineEx(Vector2({float(200+800/7/24*boost::posix_time::second_clock::local_time().time_of_day().hours()),200}),Vector2({float(200+800/7/24*boost::posix_time::second_clock::local_time().time_of_day().hours()),525}),2,Color({ 76, 172, 108, 128 }));
+                    
+                    DrawLineEx(Vector2({float(200+880.0/7.0/24.0*boost::posix_time::second_clock::local_time().time_of_day().hours()+880.0/7.0/24.0/60.0*boost::posix_time::second_clock::local_time().time_of_day().minutes()),200}),Vector2({float(200+880.0/7.0/24.0*boost::posix_time::second_clock::local_time().time_of_day().hours()+880.0/7.0/24.0/60.0*boost::posix_time::second_clock::local_time().time_of_day().minutes()),525}),2,Color({ 76, 172, 108, 128 }));
                 }
                 
                 for (Button i : buttonsVector)
@@ -1053,7 +1151,7 @@ int main(void)
 
                     if(i.IsClicked())
                     {
-                        if(i.text !="historicalWeather" && i.text !="currentWeather" && i.text != "back to start")
+                        if(i.text !="historicalWeather" && i.text !="currentWeather" && i.text != "back to start" && i.text != "add to saved")
                             {chartType = i.text;}
                         else
                         {
@@ -1071,9 +1169,64 @@ int main(void)
                             if(i.text == "back to start")
                             {
                                 state = "start";
-                                buttonsVector.clear();
+                                
                             }
-                            
+                            if(i.text == "add to saved")
+                            {
+                                
+                                
+
+                                bool NotFoundEmpty = true;
+                                //TEST DEBUG
+                                for (int i =0;i<maxSavedLocations;i++)
+                                {
+                                    
+                                    if(savedLocationsJson[i]["name"]== "empty" && NotFoundEmpty)
+                                        {
+                                        currentPage = i;
+                                        NotFoundEmpty = false;}
+                                }
+                                if(NotFoundEmpty)
+                                {
+                                    state = "saved";
+                                }
+                                else
+                                {
+                                    buttonsVector.clear();
+                                    inputBoxVector.clear();
+
+                                    buttonToEdit.xloc = 390;
+                                    buttonToEdit.yloc = 620;
+                                    buttonToEdit.width = 500;
+                                    buttonToEdit.height = 100;
+                                    buttonToEdit.text = "confirm";
+                                    buttonToEdit.color = BLUE;
+                                    buttonToEdit.fontSize = 20;
+                                    buttonsVector.push_back(buttonToEdit);
+                                    
+                                    inputBoxToEdit.xloc = 390;
+                                    inputBoxToEdit.yloc = 100;
+                                    inputBoxToEdit.height = 100;
+                                    inputBoxToEdit.width = 500;
+                                    inputBoxToEdit.mode = "text";
+                                    inputBoxToEdit.text = "";
+                                    inputBoxVector.push_back(inputBoxToEdit);
+
+                                    inputBoxToEdit.yloc = 300;
+                                    inputBoxToEdit.mode = "numbers";
+                                    inputBoxToEdit.text = lat;
+                                    inputBoxVector.push_back(inputBoxToEdit);
+                                    inputBoxToEdit.yloc = 500;
+                                    inputBoxToEdit.mode = "numbers";
+                                    inputBoxToEdit.text = lng;
+                                    inputBoxVector.push_back(inputBoxToEdit);
+                                   
+                                    if(currentPage>=SavedLocationsShowing)
+                                    {SavedLocationsShowing++;}
+                                    state = "editSaved";
+                                }
+                                
+                            }
                         }
                     }
                 }
@@ -1383,12 +1536,56 @@ int main(void)
                     }
                 }
             }
-            if(state == "openingJsonError")
+            if(state == "openingSavedLocationsJsonErrorButtons")
+            {
+                buttonsVector.clear();
+                buttonToEdit.color = BLUE;
+                buttonToEdit.fontSize = 30;
+                buttonToEdit.height = 100;
+                buttonToEdit.width = 300;
+                buttonToEdit.yloc = 580;
+
+                
+                buttonToEdit.text = "run without saved";
+                buttonToEdit.xloc = 40;
+                buttonsVector.push_back(buttonToEdit);
+                buttonToEdit.text = "try again";
+                buttonToEdit.xloc = 490;
+                buttonsVector.push_back(buttonToEdit);
+                buttonToEdit.text = "close app";
+                buttonToEdit.xloc = 940;
+                buttonsVector.push_back(buttonToEdit);
+                state = "openingSavedLocationsJsonError";
+            }
+            if(state == "openingSavedLocationsJsonError")
             {
                 DrawTextEx(fontDefault,"there was error while trying to open savedLocations.json",Vector2({0,0}),50,1,BLACK);
                 DrawTextEx(fontDefault,"please repair it yourself or delete it and edit values in",Vector2({0,50}),50,1,BLACK);
                 DrawTextEx(fontDefault,"new file that will generate after opening app without file",Vector2({0,100}),50,1,BLACK);
                 
+                for(Button i : buttonsVector)
+                {
+                    i.Draw();
+                    if(i.IsClicked())
+                    {
+                        if(i.text == "close app")
+                        {
+                            exit(1);
+                        }
+                        if(i.text == "try again")
+                        {
+                            buttonsVector.clear();
+                            state = "savedStart";
+                        }
+                        if(i.text == "run without saved")
+                        {
+                            buttonsVector.clear();
+                            savedAllowed = false;
+                            state = "start";
+                        }
+                        
+                    }
+                }
 
             }
             
@@ -1419,7 +1616,7 @@ int main(void)
     
 
     
-    if (state != "openingJsonError")
+    if (state != "openingSavedLocationsJsonError")
     {
     savedLocationsFile.open("savedLocations.json",std::fstream::in | std::fstream::out |std::fstream::trunc);
     savedLocationsFile<<savedLocationsJson;
